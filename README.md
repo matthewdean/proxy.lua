@@ -1,7 +1,7 @@
 Uses
 ===================
 * sandboxing
-* adding/modifying ROBLOX Instance methods easily
+* wrap an environment to control access to it
 
 Usage
 ===================
