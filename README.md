@@ -1,10 +1,10 @@
 Uses
 ===================
-* sandboxing
-* wrap an environment to control access to it
+* sandbox
+* extend an API
 
 Usage
-===================
+--------------------
     local proxy = require(Game.ServerScriptService.Proxy)
     
     local env = proxy.new(getfenv(0), {
