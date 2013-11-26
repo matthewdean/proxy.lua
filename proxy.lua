@@ -1,159 +1,117 @@
-local proxy do
+local WrapperLookup = setmetatable({},{_mode='v'})
+local ValueLookup = setmetatable({},{_mode='k'})
+local HookLookup = {}
 
-	proxy = {}
-
-	local WeakMode = {
-		Key = {__mode = "k"},
-		Value = {__mode = "v"},
-		KeyValue = {__mode = "kv"}
+local userdataMT do
+	local defaults = {
+		__len       = function(a) return #a end;
+		__unm       = function(a) return -a end;
+		__add       = function(a, b) return a + b end;
+		__sub       = function(a, b) return a - b end;
+		__mul       = function(a, b) return a * b end;
+		__div       = function(a, b) return a / b end;
+		__mod       = function(a, b) return a % b end;
+		__pow       = function(a, b) return a ^ b end;
+		__lt        = function(a, b) return a < b end;
+		__eq        = function(a, b) return a == b end;
+		__le        = function(a, b) return a <= b end;
+		__concat    = function(a, b) return a .. b end;
+		__call      = function(f, ...) return f(...) end;
+		__tostring  = function(a) return tostring(a) end;
+		__index     = function(t, k) return t[k] end;
+		__newindex  = function(t, k, v) t[k] = v end;
+		__metatable = function() return 'The metatable is locked' end;
 	}
-	
-	local WrapperLookup = setmetatable({}, WeakMode.Value)
-	local DataLookup = setmetatable({}, WeakMode.Key)
-	local IsTrusted = setmetatable({}, WeakMode.Key)
 
-	local Metamethods = {
-		__len = function(a)
-			return #a
-		end,
-		__unm = function(a)
-			return -a
-		end,
-		__add = function(a, b)
-			return a + b
-		end,
-		__sub = function(a, b)
-			return a - b
-		end,
-		__mul = function(a, b)
-			return a * b
-		end,
-		__div = function(a, b)
-			return a / b
-		end,
-		__mod = function(a, b)
-			return a % b
-		end,
-		__pow = function(a, b)
-			return a ^ b
-		end,
-		__lt = function (a, b)
-			return a < b
-		end,
-		__eq = function (a, b)
-			return a == b
-		end,
-		__le = function (a, b)
-			return a <= b
-		end,
-		__concat = function(a, b)
-			return a .. b
-		end,
-		__call = function(f, ...)
-			return f(...)
-		end,
-		__tostring = function(a)
-			return tostring(a)
-		end,
-		__index = function(t, k)
-			return t[k]
-		end,
-		__newindex = function(t, k, v)
-			t[k] = v
-		end,
-		__metatable = function(t)
-			return getmetatable(t)
-		end,
-	}
-	
-	local WrapData
-	
-	local WrapReturnValues = function(func, returnValues)
-		for i, value in pairs(returnValues) do
-			
-			-- if the return value has never been seen before
-			-- it must be from the environment, trust it
-			if IsTrusted[value] == nil then
-				IsTrusted[value] = true
-			end
+	userdataMT = {}
 
-			-- if the function was trusted, wrap the return values
-			if IsTrusted[func] == true then
-				returnValues[i] = WrapData(value)
-			end
+	for method,default in pairs(mtHooks) do
+		userdataMT[method] = function(...)
+			local hooks = HookLookup[getfenv(2)]
+			local func = hooks and hooks[method] or default
+			return unpack( WrapValue{func(unpack( Unwrap{...} ))} )
 		end
 	end
-	
-	local function UnwrapArguments(func, args)
-		for i, arg in pairs(args) do
-			
-			-- if the argument has never been seen before
-			-- it must be user-created
-			if IsTrusted[arg] == nil then
-				IsTrusted[arg] = false
-			end
+end
 
-			-- only unwrap the argument if we trust the function
-			if IsTrusted[func] == true then
-				args[i] = DataLookup[arg] or arg
-			end
-		end
+local function UnwrapValue(wrapper)
+	-- handles function and userdata
+	local value = ValueLookup[wrapper]
+	if value then
+		return value
 	end
-	
-	local WrapFunction = function(f)
-		return function(...)
-			local n = select("#", ...)
-			local args = {...}
-			UnwrapArguments(f, args)
-			local results = { ypcall(function(...) return f(...) end, unpack(args, 1, n)) }
-			local success = table.remove(results, 1)
-			WrapReturnValues(f, results)
-			if success then
-				return unpack(results, 1, n)
+
+	local type = type(wrapper)
+	if type == 'table' then
+		local value = {}
+		for k,v in pairs(table) do
+			value[UnwrapValue(k)] = UnwrapValue(v)
+		end
+		return value
+	elseif type == 'function' then
+		-- if function was not in ValueLookup, then it's probably a user-made
+		-- function being newindex'd (i.e. Callback)
+		local function value(...)
+			local results = {ypcall(value,unpack(WrapValue{...}))}
+			if results[1] then
+				return unpack(UnwrapValue(results),2)
 			else
-				error(results[1], 2)
+				-- error
 			end
 		end
+
+		WrapperLookup[value] = wrapper
+		ValueLookup[wrapper] = value
+		return value
+	elseif type == 'userdata' then
+		return nil
+	else
+		return wrapper
 	end
-	
-	local function SetMetamethod(index, metamethod)
-		IsTrusted[metamethod] = true
-		Metamethods[index] = WrapData(metamethod)
+end
+
+local function WrapValue(value)
+	local wrapper = WrapperLookup[value]
+	if wrapper then
+		return wrapper
 	end
-	
-	WrapData = function(data)
-		local wrapper = WrapperLookup[data]
-		if wrapper then
-			return wrapper
+
+	local type = type(value)
+	if type == 'table' then
+		local wrapper = {}
+		for k,v in pairs(table) do
+			wrapper[WrapValue(k)] = WrapValue(v)
 		end
-		if type(data) == "table" or type(data) == "userdata" then
-			wrapper = setmetatable({}, Metamethods)
-			DataLookup[wrapper] = data
-			WrapperLookup[data] = wrapper
-			return wrapper
-		elseif type(data) == "function" then
-			wrapper = WrapFunction(data)
-			DataLookup[wrapper] = data
-			WrapperLookup[data] = wrapper
-			return wrapper
-		else
-			return data
+		return wrapper
+	elseif type == 'function' then
+		local function wrapper(...)
+			local results = {ypcall(value,unpack(UnwrapValue{...}))}
+			if results[1] then
+				return unpack(WrapValue(results),2)
+			else
+				-- error
+			end
 		end
+
+		WrapperLookup[value] = wrapper
+		ValueLookup[wrapper] = value
+		return wrapper
+	elseif type == 'userdata' then
+		local wrapper = setmetable({},userdataMT)
+		WrapperLookup[value] = wrapper
+		ValueLookup[wrapper] = value
+		return wrapper
+	else
+		return value
 	end
-	
-	for index, metamethod in pairs(Metamethods) do
-		SetMetamethod(index, metamethod)
-	end
-	
-	proxy.new = function(options)
-		local result = WrapData(options.environment)
-		print('env has been wrapped')
-		options.metamethods = options.metamethods or {}
-		for index, metamethod in pairs(options.metamethods) do
-			SetMetamethod(index, metamethod)
-		end
-		return result
-	end
+end
+
+local proxy = {}
+
+function proxy.new(options)
+	local env = options.environment or {}
+	HookLookup[env] = options.metamethods
+	return WrapValue(env)
 end
 
 return proxy
