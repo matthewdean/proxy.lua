@@ -1,3 +1,8 @@
+Uses
+===================
+* sandboxing
+* adding/modifying ROBLOX Instance methods easily
+
 Usage
 ===================
     local proxy = require(Game.ServerScriptService.Proxy)
