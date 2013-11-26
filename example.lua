@@ -1,4 +1,4 @@
-local ProxyEnvironment = require(script.Parent.ProxyEnvironment)
+local proxy = require(script.Parent.Proxy)
 
 local function IsInstance(value)
 	if type(value) == 'userdata' then
@@ -8,16 +8,27 @@ local function IsInstance(value)
 	return false
 end
 
-local env = ProxyEnvironment.new {
+local GetterLookup = {
+	Player = {
+		Kill = function(player)
+			if player.Character and player.Character:FindFirstChild("Humanoid") then
+				player.Character:BreakJoints()
+			end
+		end,
+	}
+}
+
+local env = proxy.new({
 	environment = getfenv(0),
 	metamethods = {
 		__index = function(t, k)
-			if IsInstance(t) and t.ClassName == "DataModel" and k == "PlaceId" then
-				return 1818
+			if IsInstance(t) and GetterLookup[t.ClassName] and GetterLookup[t.ClassName][k] then
+				return GetterLookup[t.ClassName][k]
 			end
 			return t[k]
 		end
 	}
-}
+})
 
-setfenv(function() print(Game.PlaceId) end, env)()
+-- keep in mind that upvalues will leak to this function
+setfenv(function() Game.Players.LocalPlayer:Kill() end, env)()
