@@ -1,6 +1,6 @@
-local ProxyEnvironment do
+local proxy do
 
-	ProxyEnvironment = {}
+	proxy = {}
 
 	local WeakMode = {
 		Key = {__mode = "k"},
@@ -145,7 +145,7 @@ local ProxyEnvironment do
 		SetMetamethod(index, metamethod)
 	end
 	
-	ProxyEnvironment.new = function(options)
+	proxy.new = function(options)
 		local result = WrapData(options.environment)
 		print('env has been wrapped')
 		options.metamethods = options.metamethods or {}
@@ -156,4 +156,4 @@ local ProxyEnvironment do
 	end
 end
 
-return ProxyEnvironment
+return proxy
