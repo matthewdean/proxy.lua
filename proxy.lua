@@ -73,7 +73,8 @@ function proxy.new(options)
 				if results[1] then
 					return unwrapValues(unpack(results,2))
 				else
-					-- error
+					-- ruh roh! UnwrapValue may be recursive, leading to wrong stack error level
+					error(results[2],2)
 				end
 			end
 
@@ -81,7 +82,7 @@ function proxy.new(options)
 			ValueLookup[wrapper] = value
 			return value
 		elseif type == 'userdata' then
-			-- fail; unwrap userdata == bad
+			error('unwrapped userdata',2)
 		else
 			return wrapper
 		end
@@ -100,7 +101,7 @@ function proxy.new(options)
 				if results[1] then
 					return wrapValues(unpack(results,2))
 				else
-					-- error
+					error(results[2],2)
 				end
 			end
 
