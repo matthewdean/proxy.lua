@@ -50,6 +50,10 @@ function proxy.new(options)
 		return unpack(args,1,n)
 	end
 
+	local function getArgs(...)
+		return {...},select('#',...)
+	end
+
 	function UnwrapValue(wrapper)
 		-- handles function and userdata
 		local value = ValueLookup[wrapper]
@@ -69,9 +73,9 @@ function proxy.new(options)
 			-- if function was not in ValueLookup, then it's probably a user-made
 			-- function being newindex'd (i.e. Callback)
 			local function value(...)
-				local results = {ypcall(value,wrapValues(...))}
+				local results,n = getArgs(ypcall(value,wrapValues(...)))
 				if results[1] then
-					return unwrapValues(unpack(results,2))
+					return unwrapValues(unpack(results,2,n))
 				else
 					-- ruh roh! UnwrapValue may be recursive, leading to wrong stack error level
 					error(results[2],2)
@@ -97,9 +101,9 @@ function proxy.new(options)
 		local type = type(value)
 		if type == 'function' then
 			local function wrapper(...)
-				local results = {ypcall(value,unwrapValues(...))}
+				local results,n = getArgs(ypcall(value,unwrapValues(...)))
 				if results[1] then
-					return wrapValues(unpack(results,2))
+					return wrapValues(unpack(results,2,n))
 				else
 					error(results[2],2)
 				end
