@@ -144,7 +144,7 @@ function proxy.new(options)
 			-- we could use a table and do wrapper = setmetatable({},userdataMT)
 			-- advantage is fewer metatables (less waste)
 			-- but the __len metamethod wouldn't fire
-			-- so #{1,2,3} would be 0 which is unacceptable
+			-- so if _G was {1,2,3}, #_G would be 0 which is unacceptable
 			local wrapper = newproxy(true)
 			local metatable = getmetatable(wrapper)
 			for method, func in pairs(userdataMT) do
