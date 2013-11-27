@@ -128,7 +128,8 @@ function proxy.new(options)
 		local type = type(value)
 		if type == 'function' then
 			local function wrapper(...)
-				local results,n = getArgs(ypcall(value,unwrapValues(...)))
+				local results,n = getArgs(ypcall(function(...) return value(...) end,unwrapValues(...)))
+				-- anonymous function necessary because ypcall(C function) fails e.g. ypcall(wait)
 				if results[1] then
 					return wrapValues(unpack(results,2,n))
 				else
