@@ -29,6 +29,27 @@ function proxy.new(options)
 
 	local userdataMT
 
+	local WrapValue
+	local UnwrapValue
+
+	local function wrapValues(...)
+		local args = {...}
+		local n = select('#',...)
+		for i = 1,n do
+			args[i] = WrapValue(args[i])
+		end
+		return unpack(args,1,n)
+	end
+
+	local function unwrapValues(...)
+		local args = {...}
+		local n = select('#',...)
+		for i = 1,n do
+			args[i] = UnwrapValue(args[i])
+		end
+		return unpack(args,1,n)
+	end
+
 	function UnwrapValue(wrapper)
 		-- handles function and userdata
 		local value = ValueLookup[wrapper]
@@ -48,9 +69,9 @@ function proxy.new(options)
 			-- if function was not in ValueLookup, then it's probably a user-made
 			-- function being newindex'd (i.e. Callback)
 			local function value(...)
-				local results = {ypcall(value,unpack(WrapValue{...}))}
+				local results = {ypcall(value,wrapValues(...))}
 				if results[1] then
-					return unpack(UnwrapValue(results),2)
+					return unwrapValues(unpack(results,2))
 				else
 					-- error
 				end
@@ -75,9 +96,9 @@ function proxy.new(options)
 		local type = type(value)
 		if type == 'function' then
 			local function wrapper(...)
-				local results = {ypcall(value,unpack(UnwrapValue{...}))}
+				local results = {ypcall(value,unwrapValues(...))}
 				if results[1] then
-					return unpack(WrapValue(results),2)
+					return wrapValues(unpack(results,2))
 				else
 					-- error
 				end
@@ -87,7 +108,7 @@ function proxy.new(options)
 			ValueLookup[wrapper] = value
 			return wrapper
 		elseif type == 'table' or type == 'userdata' then
-			local wrapper = setmetable({},userdataMT)
+			local wrapper = setmetatable({},userdataMT)
 			WrapperLookup[value] = wrapper
 			ValueLookup[wrapper] = value
 			return wrapper
@@ -100,7 +121,7 @@ function proxy.new(options)
 	for method,default in pairs(defaultMetamethods) do
 		userdataMT[method] = function(...)
 			local func = hooks[method] or default
-			return unpack( WrapValue{func(unpack( UnwrapValue{...} ))} )
+			return wrapValues(func(unwrapValues(...)))
 		end
 	end
 
