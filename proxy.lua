@@ -37,7 +37,14 @@ function proxy.new(options)
 		end
 
 		local type = type(wrapper)
-		if type == 'function' then
+		if type == 'table' then
+			-- assumes table is immutable
+			local value = {}
+			for k,v in pairs(wrapper) do
+				value[UnwrapValue(k)] = UnwrapValue(v)
+			end
+			return value
+		elseif type == 'function' then
 			-- if function was not in ValueLookup, then it's probably a user-made
 			-- function being newindex'd (i.e. Callback)
 			local function value(...)
@@ -52,8 +59,8 @@ function proxy.new(options)
 			WrapperLookup[value] = wrapper
 			ValueLookup[wrapper] = value
 			return value
-		elseif type == 'table' or type == 'userdata' then
-			return nil
+		elseif type == 'userdata' then
+			-- fail; unwrap userdata == bad
 		else
 			return wrapper
 		end
