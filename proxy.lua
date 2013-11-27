@@ -2,39 +2,9 @@ local WrapperLookup = setmetatable({},{_mode='v'})
 local ValueLookup = setmetatable({},{_mode='k'})
 local HookLookup = {}
 
-local userdataMT do
-	local defaults = {
-		__len       = function(a) return #a end;
-		__unm       = function(a) return -a end;
-		__add       = function(a, b) return a + b end;
-		__sub       = function(a, b) return a - b end;
-		__mul       = function(a, b) return a * b end;
-		__div       = function(a, b) return a / b end;
-		__mod       = function(a, b) return a % b end;
-		__pow       = function(a, b) return a ^ b end;
-		__lt        = function(a, b) return a < b end;
-		__eq        = function(a, b) return a == b end;
-		__le        = function(a, b) return a <= b end;
-		__concat    = function(a, b) return a .. b end;
-		__call      = function(f, ...) return f(...) end;
-		__tostring  = function(a) return tostring(a) end;
-		__index     = function(t, k) return t[k] end;
-		__newindex  = function(t, k, v) t[k] = v end;
-		__metatable = function(t) return getmetatable(t) end;
-	}
+local userdataMT
 
-	userdataMT = {}
-
-	for method,default in pairs(mtHooks) do
-		userdataMT[method] = function(...)
-			local hooks = HookLookup[getfenv(2)]
-			local func = hooks and hooks[method] or default
-			return unpack( WrapValue{func(unpack( Unwrap{...} ))} )
-		end
-	end
-end
-
-local function UnwrapValue(wrapper)
+function UnwrapValue(wrapper)
 	-- handles function and userdata
 	local value = ValueLookup[wrapper]
 	if value then
@@ -64,7 +34,7 @@ local function UnwrapValue(wrapper)
 	end
 end
 
-local function WrapValue(value)
+function WrapValue(value)
 	local wrapper = WrapperLookup[value]
 	if wrapper then
 		return wrapper
@@ -94,6 +64,38 @@ local function WrapValue(value)
 	end
 end
 
+do
+	local defaults = {
+		__len       = function(a) return #a end;
+		__unm       = function(a) return -a end;
+		__add       = function(a, b) return a + b end;
+		__sub       = function(a, b) return a - b end;
+		__mul       = function(a, b) return a * b end;
+		__div       = function(a, b) return a / b end;
+		__mod       = function(a, b) return a % b end;
+		__pow       = function(a, b) return a ^ b end;
+		__lt        = function(a, b) return a < b end;
+		__eq        = function(a, b) return a == b end;
+		__le        = function(a, b) return a <= b end;
+		__concat    = function(a, b) return a .. b end;
+		__call      = function(f, ...) return f(...) end;
+		__tostring  = function(a) return tostring(a) end;
+		__index     = function(t, k) return t[k] end;
+		__newindex  = function(t, k, v) t[k] = v end;
+		__metatable = function(t) return getmetatable(t) end;
+	}
+
+	userdataMT = {}
+
+	for method,default in pairs(mtHooks) do
+		userdataMT[method] = function(...)
+			local hooks = HookLookup[getfenv(2)]
+			local func = hooks and hooks[method] or default
+			return unpack( WrapValue{func(unpack( UnwrapValue{...} ))} )
+		end
+	end
+end
+
 local proxy = {}
 
 function proxy.new(options)
@@ -103,3 +105,6 @@ function proxy.new(options)
 end
 
 return proxy
+
+
+-- unwrap is used only on function arguments
