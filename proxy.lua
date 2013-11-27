@@ -42,13 +42,7 @@ local function UnwrapValue(wrapper)
 	end
 
 	local type = type(wrapper)
-	if type == 'table' then
-		local value = {}
-		for k,v in pairs(table) do
-			value[UnwrapValue(k)] = UnwrapValue(v)
-		end
-		return value
-	elseif type == 'function' then
+	if type == 'function' then
 		-- if function was not in ValueLookup, then it's probably a user-made
 		-- function being newindex'd (i.e. Callback)
 		local function value(...)
@@ -63,7 +57,7 @@ local function UnwrapValue(wrapper)
 		WrapperLookup[value] = wrapper
 		ValueLookup[wrapper] = value
 		return value
-	elseif type == 'userdata' then
+	elseif type == 'table' or type == 'userdata' then
 		return nil
 	else
 		return wrapper
@@ -77,13 +71,7 @@ local function WrapValue(value)
 	end
 
 	local type = type(value)
-	if type == 'table' then
-		local wrapper = {}
-		for k,v in pairs(table) do
-			wrapper[WrapValue(k)] = WrapValue(v)
-		end
-		return wrapper
-	elseif type == 'function' then
+	if type == 'function' then
 		local function wrapper(...)
 			local results = {ypcall(value,unpack(UnwrapValue{...}))}
 			if results[1] then
@@ -96,7 +84,7 @@ local function WrapValue(value)
 		WrapperLookup[value] = wrapper
 		ValueLookup[wrapper] = value
 		return wrapper
-	elseif type == 'userdata' then
+	elseif type == 'table' or type == 'userdata' then
 		local wrapper = setmetable({},userdataMT)
 		WrapperLookup[value] = wrapper
 		ValueLookup[wrapper] = value
