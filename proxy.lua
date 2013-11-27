@@ -141,7 +141,15 @@ function proxy.new(options)
 			ValueLookup[wrapper] = value
 			return wrapper
 		elseif type == 'table' or type == 'userdata' then
-			local wrapper = setmetatable({},userdataMT)
+			-- we could use a table and do wrapper = setmetatable({},userdataMT)
+			-- advantage is fewer metatables (less waste)
+			-- but the __len metamethod wouldn't fire
+			-- so #{1,2,3} would be 0 which is unacceptable
+			local wrapper = newproxy(true)
+			local metatable = getmetatable(wrapper)
+			for method, func in pairs(userdataMT) do
+				metatable[method] = func
+			end
 			WrapperLookup[value] = wrapper
 			ValueLookup[wrapper] = value
 			return wrapper
