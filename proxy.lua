@@ -1,3 +1,21 @@
+--[[
+Some definitions:
+
+- user region : Code that is run by the user. Arbitrary and dangerous.
+- proxy-thing region : Code that is run internally. Initial environment variables, roblox instances, etc
+- wrap : To pass a value from the proxy-thing region to the user region.
+- unwrap : To pass a value from the user region to the proxy-thing region.
+- wrapped [value] : A value as it exists in the user region.
+- unwrapped [value] : A value as it exists in the proxy-thing region.
+
+Notes:
+
+Values like functions and tables created in the user region are considered
+wrapped, even though they technically don't have anything wrapped around them.
+Consider the definitions.
+
+]]
+
 local defaultMetamethods = {
 	__len       = function(a) return #a end;
 	__unm       = function(a) return -a end;
@@ -68,6 +86,15 @@ function proxy.new(options)
 			for k,v in pairs(wrapper) do
 				value[UnwrapValue(k)] = UnwrapValue(v)
 			end
+			-- Table is not lookup'd; if the contents of the wrapped table
+			-- change, then the unwrapped table would be outdated. CONFLICT!
+			-- Will create a new unwrapped table each time the same wrapped
+			-- table is passed. e.g. bad for setmetatable, rawset, etc. Q: Why
+			-- can't we reference them? A: They are mutable. Q: Use
+			-- metamethods? This would be in the user region. Q: Aren't there
+			-- cases where functions wont invoke metamethods? A: Those
+			-- functions would be wrapped, so they would be not-invoking
+			-- unwrapped metamethods.
 			return value
 		elseif type == 'function' then
 			-- if function was not in ValueLookup, then it's probably a user-made
