@@ -20,7 +20,7 @@ local userdataMT do
 		__tostring  = function(a) return tostring(a) end;
 		__index     = function(t, k) return t[k] end;
 		__newindex  = function(t, k, v) t[k] = v end;
-		__metatable = function() return 'The metatable is locked' end;
+		__metatable = function(t) return getmetatable(t) end;
 	}
 
 	userdataMT = {}
