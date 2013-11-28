@@ -38,8 +38,8 @@ local defaultMetamethods = {
 
 local proxy = {}
 
-function proxy.new(options)
-	local env = options.environment or {}
+function proxy.new(env, options)
+	env = env or {}
 	local hooks = options.metamethods or {}
 
 	local WrapperLookup = setmetatable({},{_mode='v'})
