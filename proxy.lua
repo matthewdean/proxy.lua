@@ -141,10 +141,8 @@ function proxy.new(options)
 			ValueLookup[wrapper] = value
 			return wrapper
 		elseif type == 'table' or type == 'userdata' then
-			-- we could use a table and do wrapper = setmetatable({},userdataMT)
-			-- advantage is fewer metatables (less waste)
-			-- but the __len metamethod wouldn't fire
-			-- so if _G was {1,2,3}, #_G would be 0 which is unacceptable
+			-- wrappers are userdata instead of tables
+			-- because the __len metamethod actually fires
 			local wrapper = newproxy(true)
 			local metatable = getmetatable(wrapper)
 			for method, func in pairs(userdataMT) do
@@ -166,7 +164,13 @@ function proxy.new(options)
 		end
 	end
 
-	return WrapValue(env)
+	-- the environment wrapper can't be a userdata because `setfenv` expects a table
+	-- downside of using a table: #envWrapper will return 0 (the length of the wrapper)
+	-- regardless of the environment's actual length
+	local envWrapper = setmetatable({},userdataMT)
+	ValueLookup[envWrapper] = env
+	WrapperLookup[env] = wrapper
+	return envWrapper
 end
 
 return proxy
