@@ -1,22 +1,35 @@
 proxy.lua
 ===================
-
-Uses
-------------------
-* sandbox
-* extend an API
+* Intended for ROBLOX, which uses Lua 5.1 for its embedded scripting language
+* Proxies access to tables, userdata, and functions. You can specify metamethods to override the default ones.
+* Useful for sandboxing or extending an environment
 
 Usage
---------------------
-    local proxy = require(Game.ServerScriptService.Proxy)
+------------------
+    local proxy = require(script.Parent.Proxy
     
-    local env = proxy.new(getfenv(0), {
-      __index = function(t, k)
-        if t == getfenv(0) and k == "print" then
-          return function(...) print('muhahah hijacked print', ....)
+    local isInstance = function(value)
+        if type(value) == 'userdata' then
+                local success,out = pcall(Game.GetService, Game, value)
+                return success and out == nil
         end
-        return t[k]
-      end
+        return false
+    end
+    
+    local env = proxy.new({
+        environment = getfenv(0),
+        metamethods = {
+            __index == function(t, k)
+                if isInstance(t[k]) then
+                    return nil
+                end
+                return t[k]
+            end
+        }
     })
     
-    setfenv(function() print(1492) end, env)()
+    setfenv(0, env)
+    
+    print(Game) --> nil
+    print(Workspace) --> nil
+    print(Instance.new('Part')) --> Part
