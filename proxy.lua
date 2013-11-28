@@ -128,7 +128,8 @@ function proxy.new(options)
 		local type = type(value)
 		if type == 'function' then
 			local function wrapper(...)
-				local results,n = getArgs(ypcall(value,unwrapValues(...)))
+				local results,n = getArgs(ypcall(function(...) return value(...) end,unwrapValues(...)))
+				-- anonymous function necessary because ypcall(C function) fails e.g. ypcall(wait)
 				if results[1] then
 					return wrapValues(unpack(results,2,n))
 				else
@@ -140,7 +141,15 @@ function proxy.new(options)
 			ValueLookup[wrapper] = value
 			return wrapper
 		elseif type == 'table' or type == 'userdata' then
-			local wrapper = setmetatable({},userdataMT)
+			-- we could use a table and do wrapper = setmetatable({},userdataMT)
+			-- advantage is fewer metatables (less waste)
+			-- but the __len metamethod wouldn't fire
+			-- so if _G was {1,2,3}, #_G would be 0 which is unacceptable
+			local wrapper = newproxy(true)
+			local metatable = getmetatable(wrapper)
+			for method, func in pairs(userdataMT) do
+				metatable[method] = func
+			end
 			WrapperLookup[value] = wrapper
 			ValueLookup[wrapper] = value
 			return wrapper
