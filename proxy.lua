@@ -169,7 +169,7 @@ function proxy.new(options)
 	-- regardless of the environment's actual length
 	local envWrapper = setmetatable({},userdataMT)
 	ValueLookup[envWrapper] = env
-	WrapperLookup[env] = wrapper
+	WrapperLookup[env] = envWrapper
 	return envWrapper
 end
 
