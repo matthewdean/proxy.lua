@@ -13,9 +13,6 @@ local convertValue do
 		return {...}, select('#', ...)
 	end
 	
-	-- from = trusted
-	-- to = untrusted
-
 	convertValue = function(mt, from, to, value)
 		local result = to.lookup[value]
 		if result then
@@ -31,12 +28,8 @@ local convertValue do
 				result[convertValue(mt,from,to,key)] = convertValue(mt,from,to,value)
 			end
 			if from.trusted == false then
-				-- changes to the user-made table (from user side) will replicate
-				-- to the "true" table which is given to the trusted side unwrapped
 				setmetatable(value,mt)
 			else
-				-- being passed back to the user side
-				-- so its a proxy table and changes will be replicated
 				setmetatable(result,mt)
 			end
 			return result
@@ -51,8 +44,6 @@ local convertValue do
 			return result
 		elseif type == 'function' then
 			result = function(...)
-				-- must wrap the function in an anonymous function to prevent
-				-- ypcall(wait)
 				local results, n = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,from,to,...)))
 				if results[1] then
 					return convertValues(mt,to,from,unpack(results,2,n))
@@ -106,6 +97,7 @@ end
 local env = proxy.new(getfenv(1), {
 	__index = function(t,k) print(t,'indexed at',k) return t[k] end
 })
+-- scared to use setfenv
 env.print(env.Game.PlaceId)
 local f = function(Game) print(Game.PlaceId) end
 env.f = f
