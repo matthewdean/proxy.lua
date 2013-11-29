@@ -27,7 +27,7 @@ local convertValue do
 			for key, value in pairs(value) do
 				result[convertValue(mt,from,to,key)] = convertValue(mt,from,to,value)
 			end
-			if from.trusted == false then
+			if not from.trusted then
 				setmetatable(value,mt)
 			else
 				setmetatable(result,mt)
@@ -44,40 +44,19 @@ local convertValue do
 			return result
 		elseif type == 'function' then
 			result = function(...)
-				local results, n = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,from,to,...)))
+				local results, n = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
 				if results[1] then
-					return convertValues(mt,to,from,unpack(results,2,n))
+					return convertValues(mt,from,to,unpack(results,2,n))
 				else
 					error(results[2],2)
 				end
 			end
-			to.lookup[value] = result
 			return result
 		else
 			return value
 		end
 	end
 end
-
---[[local defaultMetamethods = {
-		__len       = function(a) return #a end;
-		__unm       = function(a) return -a end;
-		__add       = function(a, b) return a + b end;
-		__sub       = function(a, b) return a - b end;
-		__mul       = function(a, b) return a * b end;
-		__div       = function(a, b) return a / b end;
-		__mod       = function(a, b) return a % b end;
-		__pow       = function(a, b) return a ^ b end;
-		__lt        = function(a, b) return a < b end;
-		__eq        = function(a, b) return a == b end;
-		__le        = function(a, b) return a <= b end;
-		__concat    = function(a, b) return a .. b end;
-		__call      = function(f, ...) return f(...) end;
-		__tostring  = function(a) return tostring(a) end;
-		__index     = function(t, k) return t[k] end;
-		__newindex  = function(t, k, v) t[k] = v end;
-		__metatable = function(t) return getmetatable(t) end;
-}]]
 
 local proxy = {}
 
@@ -88,17 +67,8 @@ proxy.new = function(environment, hooks)
 
 	local mt = {}
 	for method,func in pairs(hooks or {}) do
-		mt[method] = convertValue(mt,untrusted,trusted,func)
+		mt[method] = convertValue(mt,trusted,untrusted,func)
 	end
 
 	return convertValue(mt,trusted,untrusted,environment)
 end
-
-local env = proxy.new(getfenv(1), {
-	__index = function(t,k) print(t,'indexed at',k) return t[k] end
-})
--- scared to use setfenv
-env.print(env.Game.PlaceId)
-local f = function(Game) print(Game.PlaceId) end
-env.f = f
-env.f(env.Game)
