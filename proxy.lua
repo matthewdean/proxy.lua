@@ -59,7 +59,7 @@ local convertValue do
 	end
 end
 
-local defaultMetamethods = {
+--[[local defaultMetamethods = {
 		__len       = function(a) return #a end;
 		__unm       = function(a) return -a end;
 		__add       = function(a, b) return a + b end;
@@ -77,7 +77,7 @@ local defaultMetamethods = {
 		__index     = function(t, k) return t[k] end;
 		__newindex  = function(t, k, v) t[k] = v end;
 		__metatable = function(t) return getmetatable(t) end;
-}
+}]]
 
 local proxy = {}
 
@@ -87,8 +87,8 @@ proxy.new = function(environment, hooks)
 	local untrusted = {trusted = false,lookup = {}}
 
 	local mt = {}
-	for method,default in pairs(defaultMetamethods) do
-		mt[method] = convertValue(mt,untrusted,trusted, hooks[method] or default)
+	for method,func in pairs(hooks or {}) do
+		mt[method] = convertValue(mt,untrusted,trusted,func)
 	end
 
 	return convertValue(mt,trusted,untrusted,environment)
