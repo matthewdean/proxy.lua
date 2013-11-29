@@ -4,6 +4,15 @@ proxy.lua
 * Proxies access to tables, userdata, and functions. You can specify metamethods to override the default ones.
 * Useful for sandboxing or extending an environment
 
+Known Issues:
+------------------
+Errors thrown in user-supplied metamethods may be incorrect:
+
+    local a = proxy.new(getfenv(0), {
+        __call = function(f, ...) return f(...) end
+    })
+    Game()
+    --> attempt to call local 'f' (a userdata value)
 Usage
 ------------------
     local proxy = require(script.Parent.Proxy
