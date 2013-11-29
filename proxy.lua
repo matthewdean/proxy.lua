@@ -13,7 +13,7 @@ local convertValue do
 		-- a hack to get the number of values
 		-- can't just do #{...} because the table can be sparse
 		-- e.g. #{nil,5,nil} --> 0
-		return {...}, select('#', ...)
+		return {n = select('#',...), ...}
 	end
 	
 	convertValue = function(mt, from, to, value)
@@ -56,9 +56,9 @@ local convertValue do
 		elseif type == 'function' then
 			-- unwrap arguments, call function, wrap arguments
 			result = function(...)
-				local results, n = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
+				local results = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
 				if results[1] then
-					return convertValues(mt,from,to,unpack(results,2,n))
+					return convertValues(mt,from,to,unpack(results,2,results.n))
 				else
 					error(results[2],2)
 				end
