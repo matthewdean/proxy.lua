@@ -1,14 +1,12 @@
 local convertValue do
 	
-	local getReturnValues = function(...)
-		-- a hack to get the number of values
-		-- can't just do #{...} because the table can be sparse
-		-- e.g. #{nil,5,nil} --> 0
+	local pack = function(...)
+		-- in Lua 5.2, table.pack
 		return {n = select('#',...), ...}
 	end
 	
 	local convertValues = function(mt, from, to, ...)
-		local results = getReturnValues(...)
+		local results = pack(...)
 		for i = 1, results.n do
 			results[i] = convertValue(mt,from,to,results[i])
 		end
@@ -55,7 +53,7 @@ local convertValue do
 		elseif type == 'function' then
 			-- unwrap arguments, call function, wrap arguments
 			result = function(...)
-				local results = getReturnValues(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
+				local results = pack(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
 				if results[1] then
 					return convertValues(mt,from,to,unpack(results,2,results.n))
 				else
@@ -89,3 +87,5 @@ proxy.new = function(environment, hooks)
 
 	return convertValue(metatable, trusted, untrusted, environment)
 end
+
+return proxy
