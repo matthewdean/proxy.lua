@@ -13,6 +13,9 @@ Errors thrown in user-supplied metamethods may be incorrect:
     })
     Game()
     --> attempt to call local 'f' (a userdata value)
+    
+The solution is for the user to avoid supplying a custom metamethod unless necessary. For example, if he does not need to hook into userdata or tables being called, he should not supply the above metamethod.
+
 Usage
 ------------------
     local proxy = require(script.Parent.Proxy
@@ -25,16 +28,13 @@ Usage
         return false
     end
     
-    local env = proxy.new({
-        environment = getfenv(0),
-        metamethods = {
-            __index == function(t, k)
-                if isInstance(t[k]) then
-                    return nil
-                end
-                return t[k]
+    local env = proxy.new(getfenv(0), {
+        __index == function(t, k)
+            if isInstance(t[k]) then
+                return nil
             end
-        }
+            return t[k]
+        end
     })
     
     setfenv(0, env)
