@@ -1,13 +1,4 @@
 local convertValue do
-
-	local convertValues = function(mt, from, to, ...)
-		local results = {...}
-		local n = select('#',...)
-		for i = 1, n do
-			results[i] = convertValue(mt,from,to,results[i])
-		end
-		return unpack(results,1,n)
-	end
 	
 	local getReturnValues = function(...)
 		-- a hack to get the number of values
@@ -16,6 +7,14 @@ local convertValue do
 		return {n = select('#',...), ...}
 	end
 	
+	local convertValues = function(mt, from, to, ...)
+		local results = getReturnValues(...)
+		for i = 1, results.n do
+			results[i] = convertValue(mt,from,to,results[i])
+		end
+		return unpack(results,1,results.n)
+	end
+
 	convertValue = function(mt, from, to, value)
 		-- if there is already a wrapper, return it
 		-- no point in making a new one and it ensures consistency
