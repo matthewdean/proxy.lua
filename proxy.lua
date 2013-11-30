@@ -71,15 +71,16 @@ end
 
 local proxy = {}
 
-proxy.new = function(environment, hooks)
-	hooks = hooks or {}
-	
+proxy.new = function(options)
+	options = options or {}
+	local environment = options.environment or getfenv(2) -- defaults to calling function's environment
+	local metatable = options.metatable or {}
+
 	-- allow wrappers to be garbage-collected
 	local trusted = {trusted = true,lookup = setmetatable({},{__mode='k'})}
 	local untrusted = {trusted = false,lookup = setmetatable({},{__mode='v'})}
 
-	local metatable = {}
-	for event, metamethod in pairs(hooks) do
+	for event, metamethod in pairs(metatable) do
 		-- the metamethod will be fired on the wrapper class
 		-- so we need to unwrap the arguments and wrap the return values
 		metatable[event] = convertValue(metatable, trusted, untrusted, metamethod)
