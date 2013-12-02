@@ -71,6 +71,26 @@ end
 
 local proxy = {}
 
+local defaultMetamethods = {
+        __len       = function(a) return #a end;
+        __unm       = function(a) return -a end;
+        __add       = function(a, b) return a + b end;
+        __sub       = function(a, b) return a - b end;
+        __mul       = function(a, b) return a * b end;
+        __div       = function(a, b) return a / b end;
+        __mod       = function(a, b) return a % b end;
+        __pow       = function(a, b) return a ^ b end;
+        __lt        = function(a, b) return a < b end;
+        __eq        = function(a, b) return a == b end;
+        __le        = function(a, b) return a <= b end;
+        __concat    = function(a, b) return a .. b end;
+        __call      = function(f, ...) return f(...) end;
+        __tostring  = function(a) return tostring(a) end;
+        __index     = function(t, k) return t[k] end;
+        __newindex  = function(t, k, v) t[k] = v end;
+        __metatable = function(t) return getmetatable(t) end;
+}
+
 proxy.new = function(options)
 	options = options or {}
 	local environment = options.environment or getfenv(2) -- defaults to calling function's environment
@@ -80,10 +100,10 @@ proxy.new = function(options)
 	local trusted = {trusted = true,lookup = setmetatable({},{__mode='k'})}
 	local untrusted = {trusted = false,lookup = setmetatable({},{__mode='v'})}
 
-	for event, metamethod in pairs(metatable) do
+	for event, metamethod in pairs(defaultMetamethods) do
 		-- the metamethod will be fired on the wrapper class
 		-- so we need to unwrap the arguments and wrap the return values
-		metatable[event] = convertValue(metatable, trusted, untrusted, metamethod)
+		metatable[event] = convertValue(metatable, trusted, untrusted, metatable[event] or metamethod)
 	end
 
 	return convertValue(metatable, trusted, untrusted, environment)
