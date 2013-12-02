@@ -32,4 +32,3 @@ Known Issues
     Game()
     --> attempt to call local 'f' (a userdata value)
     ```
-    This is why users should supply only necessary metamethods.
