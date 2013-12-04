@@ -60,6 +60,8 @@ local convertValue do
 					error(results[2],2)
 				end
 			end
+			to.lookup[value] = result
+			from.lookup[result] = value
 			return result
 		else
 			-- numbers, strings, booleans, nil, and threads are left as-is
