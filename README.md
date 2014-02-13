@@ -19,6 +19,9 @@ print(Game.PlaceId)
 --> 0
 ```
 
+Notes:
+__call only gets called when you do userdata() or table(). It won't happen if you call a function.
+
 Limitations
 ------------------
 1. Error messages sometimes break the illusion
