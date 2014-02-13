@@ -1,6 +1,6 @@
 proxy.lua
 ===================
-Control access to objects through metatables in RBX.Lua.
+Control access to objects through metatables. Currently aimed at Lua 5.1
 
 Usage
 ------------------
@@ -19,9 +19,9 @@ print(Game.PlaceId)
 --> 0
 ```
 
-Known Issues
+Limitations
 ------------------
-1. Errors thrown in user-supplied metamethods can be revealing:
+1. Error messages sometimes break the illusion
 
     ```lua
     local env = proxy.new {
