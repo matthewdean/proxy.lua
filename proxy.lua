@@ -51,7 +51,6 @@ local convertValue do
 			from.lookup[result] = value
 			return result
 		elseif type == 'function' then
-			-- unwrap arguments, call function, wrap arguments
 			result = function(...)
 				local results = pack(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
 				if results[1] then
@@ -60,6 +59,7 @@ local convertValue do
 					error(results[2],2)
 				end
 			end
+			-- unwrap arguments, call function, wrap arguments
 			to.lookup[value] = result
 			from.lookup[result] = value
 			return result
@@ -108,7 +108,19 @@ proxy.new = function(options)
 		metatable[event] = convertValue(metatable, trusted, untrusted, metatable[event] or metamethod)
 	end
 
-	return convertValue(metatable, trusted, untrusted, environment)
+	local env = convertValue(metatable, trusted, untrusted, environment)
+	
+	local fakeloadstring = function(...)
+		local f, err = loadstring(...)
+		if f then
+			setfenv(f, env)
+		end
+		return f, err
+	end
+	trusted.lookup[fakeloadstring] = fakeloadstring
+	untrusted.lookup[loadstring] = fakeloadstring
+
+	return env
 end
 
 return proxy
