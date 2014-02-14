@@ -19,21 +19,18 @@ setfenv(1, env)
 print(Game) --> DataModel
 ```
 
-Notes
------------------
- * __call only gets called when you do userdata() or table(). It won't happen if you call a function.
+### proxy.new(table options = {})
+
+* `environment` - the environment to wrap. defaults to an empty table.
+* `metatable` if you do something like tostring(proxy), the __tostring metamethod, will be called. defaults to an empty table meaning you aren't hooking into any events. Note that metamethods only fire on tables and userdata. e.g. t[k] = 5
 
 Limitations
 ------------------
 1. Error messages sometimes break the illusion
 
     ```lua
-    local env = proxy.new {
-        environment = getfenv(1),
-        metatable = { __call = function(f, ...) return f(...) end }
-    }
-    setfenv(1, env)
-    Game()
+    setfenv(1, proxy.new())
+    nonExtantFunction()
     --> attempt to call local 'f' (a userdata value)
     ```
     
