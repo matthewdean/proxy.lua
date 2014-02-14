@@ -1,26 +1,27 @@
 proxy.lua
 ===================
-Control access to objects through metatables. Currently aimed at Lua 5.1
+Control access to objects through metatables. Currently only works for Lua 5.1.
+
+It's great for embedded systems where you don't control the C-side. If you use it as a sandbox, keep in mind that the end user will always be able to crash it, but he won't be able to break out of it.
 
 Usage
 ------------------
 ```lua
 local proxy = require(Game.ServerScripts.Proxy)
-
-local env = proxy.new {
-    environment = getfenv(1),
-    metatable = { __index = function(t, k) print(t, 'indexed at', k) return t[k] end }
-}
-setfenv(1, env)
-print(Game.PlaceId)
---> table: 0B0DE4A8 indexed at print
---> table: 0B0DE4A8 indexed at Game
---> Place1 indexed at PlaceId
---> 0
 ```
 
-Notes:
-__call only gets called when you do userdata() or table(). It won't happen if you call a function.
+```lua
+local env = proxy.new {
+  environment = setmetatable({}, {__index = getfenv(1), __metatable = "The metatable is locked"}),
+  metatable = {__tostring = function(instance) return instance.ClassName end}
+}
+setfenv(1, env)
+print(Game) --> DataModel
+```
+
+Notes
+-----------------
+ * __call only gets called when you do userdata() or table(). It won't happen if you call a function.
 
 Limitations
 ------------------
@@ -35,3 +36,7 @@ Limitations
     Game()
     --> attempt to call local 'f' (a userdata value)
     ```
+    
+TODO
+-----------------
+Add filter function
