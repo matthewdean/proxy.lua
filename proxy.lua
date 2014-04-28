@@ -54,7 +54,6 @@ local convertValue do
 		
 		local type = type(value)
 		if type == 'table' then
-			print('creating fake table')
 			result =  {}
 			-- must be indexed before keys and values are converted
 			-- otherwise stack overflow
@@ -63,7 +62,6 @@ local convertValue do
 			for key, value in pairs(value) do
 				result[convertValue(mt,from,to,key)] = convertValue(mt,from,to,value)
 			end
-			print('from trusted:', from.trusted)
 			if not from.trusted then
 				-- any future changes by the user to the table
 				-- will be picked up by the metatable and transferred to its partner
@@ -119,7 +117,7 @@ local default_metamethods = {
 	__concat    = function(a, b) return echo(a) .. echo(b) end;
 	__call      = function(f, ...) return echo(f)(...) end;
 	__tostring  = function(a) return '__tostring' end;--return tostring(a) end; -- or tostring
-	__index     = function(t, k) print(t,k) return echo(t)[k] end;
+	__index     = function(t, k) return echo(t)[k] end;
 	__newindex  = function(t, k, v) echo(t)[k] = v end;
 	__metatable = function(t) return getmetatable(t) end; -- or getmetatable
 }
