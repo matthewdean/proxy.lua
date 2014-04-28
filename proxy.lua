@@ -1,10 +1,36 @@
+--[[
+	issues:
+		sandboxed print does not use global environment's tostring?
+]]
+
+--[[
+	using local variables, in addition to the performance benefits,
+	ensures that changes to the global environment will not affect this module
+	e.g. loadstring = nil
+]]
+
+local unpack = unpack
+local type = type
+local pairs = pairs
+local setmetatable = setmetatable
+local newproxy = newproxy
+local getmetatable = getmetatable
+local pcall = pcall
+local error = error
+local select = select
+local tostring = tostring
+local null = {}
+
+local function echo(...) -- credit to mniip
+	return ...
+end
+
+local function pack(...) -- equivalent to Lua 5.2's table.pack
+	return {n = select('#',...), ...}
+end
+
 local convertValue do
-	
-	local pack = function(...)
-		-- in Lua 5.2, table.pack
-		return {n = select('#',...), ...}
-	end
-	
+
 	local convertValues = function(mt, from, to, ...)
 		local results = pack(...)
 		for i = 1, results.n do
@@ -15,15 +41,20 @@ local convertValue do
 
 	convertValue = function(mt, from, to, value)
 		-- if there is already a wrapper, return it
-		-- no point in making a new one and it ensures consistency
-		-- print(Game == Game) --> true
+		-- no point in making a new wrapper and it ensures consistency:
+		-- assert(loadstring == loadstring)
 		local result = to.lookup[value]
 		if result then
-			return result
+			if result == null then
+				return nil
+			else
+				return result
+			end
 		end
 		
 		local type = type(value)
 		if type == 'table' then
+			print('creating fake table')
 			result =  {}
 			-- must be indexed before keys and values are converted
 			-- otherwise stack overflow
@@ -32,6 +63,7 @@ local convertValue do
 			for key, value in pairs(value) do
 				result[convertValue(mt,from,to,key)] = convertValue(mt,from,to,value)
 			end
+			print('from trusted:', from.trusted)
 			if not from.trusted then
 				-- any future changes by the user to the table
 				-- will be picked up by the metatable and transferred to its partner
@@ -52,7 +84,7 @@ local convertValue do
 			return result
 		elseif type == 'function' then
 			result = function(...)
-				local results = pack(ypcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
+				local results = pack(pcall(convertValues,mt,to,from,...))
 				if results[1] then
 					return convertValues(mt,from,to,unpack(results,2,results.n))
 				else
@@ -64,63 +96,70 @@ local convertValue do
 			from.lookup[result] = value
 			return result
 		else
-			-- numbers, strings, booleans, nil, and threads are left as-is
+			-- numbers, strings, booleans, nil, and threads are returned as-is
 			-- because they are harmless
 			return value
 		end
 	end
 end
 
-local proxy = {}
-
-local defaultMetamethods = {
-        __len       = function(a) return #a end;
-        __unm       = function(a) return -a end;
-        __add       = function(a, b) return a + b end;
-        __sub       = function(a, b) return a - b end;
-        __mul       = function(a, b) return a * b end;
-        __div       = function(a, b) return a / b end;
-        __mod       = function(a, b) return a % b end;
-        __pow       = function(a, b) return a ^ b end;
-        __lt        = function(a, b) return a < b end;
-        __eq        = function(a, b) return a == b end;
-        __le        = function(a, b) return a <= b end;
-        __concat    = function(a, b) return a .. b end;
-        __call      = function(f, ...) return f(...) end;
-        __tostring  = function(a) return tostring(a) end;
-        __index     = function(t, k) return t[k] end;
-        __newindex  = function(t, k, v) t[k] = v end;
-        __metatable = function(t) return getmetatable(t) end;
+-- TODO possibly echo more variables, not sure which ones need it
+local default_metamethods = {
+	__len       = function(a) return #echo(a) end;
+	__unm       = function(a) return -echo(a) end;
+	__add       = function(a, b) return echo(a) + echo(b) end;
+	__sub       = function(a, b) return echo(a) - echo(b) end;
+	__mul       = function(a, b) return echo(a) * echo(b) end;
+	__div       = function(a, b) return echo(a) / echo(b) end;
+	__mod       = function(a, b) return echo(a) % echo(b) end; -- or math.mod
+	__pow       = function(a, b) return echo(a) ^ echo(b) end; -- or math.pow
+	__lt        = function(a, b) return echo(a) < echo(b) end;
+	__eq        = function(a, b) return echo(a) == echo(b) end;
+	__le        = function(a, b) return echo(a) <= echo(b) end;
+	__concat    = function(a, b) return echo(a) .. echo(b) end;
+	__call      = function(f, ...) return echo(f)(...) end;
+	__tostring  = function(a) return '__tostring' end;--return tostring(a) end; -- or tostring
+	__index     = function(t, k) print(t,k) return echo(t)[k] end;
+	__newindex  = function(t, k, v) echo(t)[k] = v end;
+	__metatable = function(t) return getmetatable(t) end; -- or getmetatable
 }
 
-proxy.new = function(options)
-	options = options or {}
-	local environment = options.environment or getfenv(2) -- defaults to calling function's environment
-	local metatable = options.metatable or {}
+local proxy = {}
 
-	-- allow wrappers to be garbage-collected
-	local trusted = {trusted = true,lookup = setmetatable({},{__mode='k'})}
-	local untrusted = {trusted = false,lookup = setmetatable({},{__mode='v'})}
+function proxy.new()
 
-	for event, metamethod in pairs(defaultMetamethods) do
+	local self = {}
+	-- __mode metamethod allow wrappers to be garbage-collected
+	self.trusted = {trusted = true,lookup = setmetatable({},{__mode='k'})}
+	self.untrusted = {trusted = false,lookup = setmetatable({},{__mode='v'})}
+	
+	self.metatable = {}
+	for event, metamethod in pairs(default_metamethods) do
 		-- the metamethod will be fired on the wrapper class
 		-- so we need to unwrap the arguments and wrap the return values
-		metatable[event] = convertValue(metatable, trusted, untrusted, metatable[event] or metamethod)
+		self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, metamethod)
 	end
-
-	local env = convertValue(metatable, trusted, untrusted, environment)
 	
-	local fakeloadstring = function(...)
-		local f, err = loadstring(...)
-		if f then
-			setfenv(f, env)
+	setmetatable(self, {
+		__index = proxy,
+		__call = function(self, value)
+			return convertValue(self.metatable, self.trusted, self.untrusted, value)
 		end
-		return f, err
-	end
-	trusted.lookup[fakeloadstring] = fakeloadstring
-	untrusted.lookup[loadstring] = fakeloadstring
+	})
+	
+	return self
+end
 
-	return env
+function proxy:override(real, fake)
+	if fake == nil then
+		self.untrusted.lookup[real] = null
+	elseif type(real) == 'string' then
+		local event = real
+		self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, fake)
+	else
+		self.trusted.lookup[fake] = fake
+		self.untrusted.lookup[real] = fake
+	end
 end
 
 return proxy
