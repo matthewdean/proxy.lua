@@ -5,22 +5,19 @@ Control access to Lua objects.
 ```lua
 local proxy = require('proxy').new()
 
--- comment here
-proxy.override('__index', function(t, k)
-	if t == _G and then
-	
-	end
-	return t[k]
+proxy:override('__index', function(t, k)
+  print('indexing ', t, 'at', k)
+  return t[k]
 end)
 
 -- calling proxy() wraps the given object and returns a proxy object
 _G = proxy(_G)
-shared = proxy(shared)
+print(_G._VERSION)
 ```
 
 You can also override specific values:
 
 ```lua
-proxy.override(loadstring, nil)
+proxy:override(loadstring, nil)
 print(loadstring) --> nil
 ```
