@@ -1,14 +1,9 @@
 --[[
-	issues:
-		sandboxed print does not use global environment's tostring?
+benefits of using local variables:
+	- faster access
+	- ensures that changes to the global environment will not affect this module
+	- e.g. loadstring = nil
 ]]
-
---[[
-	using local variables, in addition to the performance benefits,
-	ensures that changes to the global environment will not affect this module
-	e.g. loadstring = nil
-]]
-
 local unpack = unpack
 local type = type
 local pairs = pairs
@@ -21,16 +16,29 @@ local select = select
 local tostring = tostring
 local null = {}
 
-local function echo(...) -- credit to mniip
+--[[
+echo used to strip stack information from error messages
+local t = 5
+t()
+--> attempt to call local 't' (a number value)
+echo(t)()
+--> attempt to call a number value
+credit to mniip for this hack
+--]]
+local function echo(...) 
 	return ...
 end
 
-local function pack(...) -- equivalent to Lua 5.2's table.pack
+-- equivalent to Lua 5.2's table.pack
+-- but we are in 5.1
+local function pack(...) 
 	return {n = select('#',...), ...}
 end
 
 local convertValue do
 
+	-- takes a variadic list of arguments
+	-- and it to the other "side"
 	local convertValues = function(mt, from, to, ...)
 		local results = pack(...)
 		for i = 1, results.n do
@@ -38,13 +46,14 @@ local convertValue do
 		end
 		return unpack(results,1,results.n)
 	end
-
+	
 	convertValue = function(mt, from, to, value)
 		-- if there is already a wrapper, return it
 		-- no point in making a new wrapper and it ensures consistency:
 		-- assert(loadstring == loadstring)
 		local result = to.lookup[value]
 		if result then
+			-- hack to get around lua's lack of meaningful nil
 			if result == null then
 				return nil
 			else
@@ -82,7 +91,7 @@ local convertValue do
 			return result
 		elseif type == 'function' then
 			result = function(...)
-				local results = pack(pcall(convertValues,mt,to,from,...))
+				local results = pack(pcall(value,convertValues(mt,to,from,...)))
 				if results[1] then
 					return convertValues(mt,from,to,unpack(results,2,results.n))
 				else
@@ -109,28 +118,55 @@ local default_metamethods = {
 	__sub       = function(a, b) return echo(a) - echo(b) end;
 	__mul       = function(a, b) return echo(a) * echo(b) end;
 	__div       = function(a, b) return echo(a) / echo(b) end;
-	__mod       = function(a, b) return echo(a) % echo(b) end; -- or math.mod
-	__pow       = function(a, b) return echo(a) ^ echo(b) end; -- or math.pow
+	__mod       = function(a, b) return echo(a) % echo(b) end; -- can't use math.mod because it behaves differently
+	__pow       = function(a, b) return echo(a) ^ echo(b) end;
 	__lt        = function(a, b) return echo(a) < echo(b) end;
 	__eq        = function(a, b) return echo(a) == echo(b) end;
 	__le        = function(a, b) return echo(a) <= echo(b) end;
 	__concat    = function(a, b) return echo(a) .. echo(b) end;
 	__call      = function(f, ...) return echo(f)(...) end;
-	__tostring  = function(a) return '__tostring' end;--return tostring(a) end; -- or tostring
+	__tostring  = tostring;
 	__index     = function(t, k) return echo(t)[k] end;
-	__newindex  = function(t, k, v) echo(t)[k] = v end;
-	__metatable = function(t) return getmetatable(t) end; -- or getmetatable
+	__newindex  = function(t, k, v) print(t,k,v) echo(t)[k] = v end;
+	__metatable = getmetatable;
 }
 
 local proxy = {}
 
-function proxy.new()
+-- provide a custom implementation of a metamethod to override the default
+function proxy:override(event, metamethod)
+	self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, metamethod)
+end
 
+function proxy:get(obj)
+	return convertValue(self.metatable, self.trusted, self.untrusted, obj)
+end
+
+-- whenever the untrusted sees the old value
+-- it will be replaced with the new value
+-- so replace(loadstring, nil) will prevent all access to loadstring
+-- even pcall(loadstring, ...) will fail because loadstring will be nil
+function proxy:replace(old, new)
+	local wrapper
+	if new == nil then
+		wrapper = null
+	else
+		wrapper = convertValue(self.metatable, self.trusted, self.untrusted, new)
+		self.trusted.lookup[wrapper] = new
+	end
+	self.untrusted.lookup[old] = wrapper
+end
+
+function proxy.new()
 	local self = {}
+	
 	-- __mode metamethod allow wrappers to be garbage-collected
 	self.trusted = {trusted = true,lookup = setmetatable({},{__mode='k'})}
 	self.untrusted = {trusted = false,lookup = setmetatable({},{__mode='v'})}
 	
+	-- all objects need to share a common metatable
+	-- so the metamethods will fire
+	-- e.g. print(game == workspace), two different objects
 	self.metatable = {}
 	for event, metamethod in pairs(default_metamethods) do
 		-- the metamethod will be fired on the wrapper class
@@ -138,26 +174,8 @@ function proxy.new()
 		self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, metamethod)
 	end
 	
-	setmetatable(self, {
-		__index = proxy,
-		__call = function(self, value)
-			return convertValue(self.metatable, self.trusted, self.untrusted, value)
-		end
-	})
-	
+	setmetatable(self, {__index = proxy, __call = proxy.get})
 	return self
-end
-
-function proxy:override(real, fake)
-	if fake == nil then
-		self.untrusted.lookup[real] = null
-	elseif type(real) == 'string' then
-		local event = real
-		self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, fake)
-	else
-		self.trusted.lookup[fake] = fake
-		self.untrusted.lookup[real] = fake
-	end
 end
 
 return proxy
