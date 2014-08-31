@@ -5,6 +5,7 @@ sandbox.run = function(source)
 	local output = {}
 	
 	-- compile
+	-- note: should fail bytecode due to exploits
 	local f, err = loadstring(source, 'chunk')
 	if not f then
 		return { error = err, output = output }
