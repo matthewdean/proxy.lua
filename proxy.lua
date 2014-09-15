@@ -127,7 +127,7 @@ local default_metamethods = {
 	__call      = function(f, ...) return echo(f)(...) end;
 	__tostring  = tostring;
 	__index     = function(t, k) return echo(t)[k] end;
-	__newindex  = function(t, k, v) print(t,k,v) echo(t)[k] = v end;
+	__newindex  = function(t, k, v) echo(t)[k] = v end;
 	__metatable = getmetatable;
 }
 
