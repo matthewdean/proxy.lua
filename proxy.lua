@@ -200,16 +200,20 @@ function proxy.new()
 	
 	setmetatable(self, {__index = proxy, __call = proxy.get})
 	
-	-- these functions 
-	local functions = {
-		["table.insert"] = table.insert,
-		["table.remove"] = table.remove,
-		["table.sort"] = table.sort,
-		["rawset"] = rawset
-	}
+	self:replace(getfenv, function(f)
+		f = f or 1
+		if type(f) == "number" and f > 0  then
+			f = f + 1
+		end
+		local success, result = xpcall(function() return getfenv(f)	end, echo)
+		if not success then
+			error(result, 2)
+		else
+			return result
+		end
+	end)
 	
-	-- ugh
-	for name, f in pairs(functions) do
+	for _, f in pairs({ table.insert, table.remove, table.sort, rawset }) do
 		self:replace(f, function(...)
 			local results = pack(pcall(f,...))
 			if results[1] then
