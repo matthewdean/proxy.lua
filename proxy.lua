@@ -14,8 +14,9 @@ local pcall = pcall
 local error = error
 local select = select
 local tostring = tostring
-local null = {}
+local rawset = rawset
 
+local null = {}
 --[[
 echo used to strip stack information from error messages
 local t = 5
@@ -57,21 +58,35 @@ local convertValue do
 			if result == null then
 				return nil
 			else
+				if to.trusted and type(value) == 'table' then
+					-- __newindex doesn't fire for t[existingKey] = nil or t[existingKey] = otherValue
+					local trustedTable = result
+					local untrustedTable = value
+					for trustedKey in pairs(trustedTable) do
+						local untrustedKey = convertValue(mt, to, from, trustedKey)
+						assert(untrustedKey, "untrusted key is nil")
+						local untrustedValue = rawget(untrustedTable, untrustedKey)
+						local trustedValue = convertValue(mt, from, to, untrustedValue)
+						rawset(trustedTable, trustedKey, trustedValue)
+					end
+				end
 				return result
 			end
 		end
 		
 		local type = type(value)
 		if type == 'table' then
-			result =  {}
+			result = {}
 			-- must be indexed before keys and values are converted
 			-- otherwise stack overflow
+			--if to.trusted then
 			to.lookup[value] = result
+			--end
 			from.lookup[result] = value
 			for key, value in pairs(value) do
 				result[convertValue(mt,from,to,key)] = convertValue(mt,from,to,value)
 			end
-			if not from.trusted then
+			if to.trusted then
 				-- any future changes by the user to the table
 				-- will be picked up by the metatable and transferred to its partner
 				setmetatable(value,mt)
@@ -91,7 +106,8 @@ local convertValue do
 			return result
 		elseif type == 'function' then
 			result = function(...)
-				local results = pack(pcall(value,convertValues(mt,to,from,...)))
+				-- would do pcall(value) but there's a roblox bug w/ pcall(getfenv) atm
+				local results = pack(pcall(function(...) return value(...) end,convertValues(mt,to,from,...)))
 				if results[1] then
 					return convertValues(mt,from,to,unpack(results,2,results.n))
 				else
@@ -128,7 +144,6 @@ local default_metamethods = {
 	__tostring  = tostring;
 	__index     = function(t, k) return echo(t)[k] end;
 	__newindex  = function(t, k, v) echo(t)[k] = v end;
-	__metatable = getmetatable;
 }
 
 local proxy = {}
@@ -167,6 +182,7 @@ function proxy.new()
 	-- all objects need to share a common metatable
 	-- so the metamethods will fire
 	-- e.g. print(game == workspace), two different objects
+	
 	self.metatable = {}
 	for event, metamethod in pairs(default_metamethods) do
 		-- the metamethod will be fired on the wrapper class
@@ -174,7 +190,47 @@ function proxy.new()
 		self.metatable[event] = convertValue(self.metatable, self.trusted, self.untrusted, metamethod)
 	end
 	
+	local mt = convertValue(self.metatable, self.trusted, self.untrusted, default_metamethods.__newindex)
+	self.metatable.__newindex = function(...)
+		if type(select(1,...)) == 'table' then
+			rawset(...)
+		end
+		mt(...)
+	end
+	
 	setmetatable(self, {__index = proxy, __call = proxy.get})
+	
+	-- these functions 
+	local functions = {
+		["table.insert"] = table.insert,
+		["table.remove"] = table.remove,
+		["table.sort"] = table.sort,
+		["rawset"] = rawset
+	}
+	
+	-- ugh
+	for name, f in pairs(functions) do
+		self:replace(f, function(...)
+			local results = pack(pcall(f,...))
+			if results[1] then
+				-- copy the changes to the untrusted table, since these functions don't trigger any metamethods
+				local trustedTable = select(1, ...)
+				local untrustedTable = convertValue(self.metatable, self.trusted, self.untrusted, trustedTable)
+				for k in pairs(untrustedTable) do
+					rawset(untrustedTable, k, nil)
+				end
+				for k, v in pairs(trustedTable) do
+					local untrustedKey = convertValue(self.metatable, self.trusted, self.untrusted, k)
+					local untrustedValue = convertValue(self.metatable, self.trusted, self.untrusted, v)
+					rawset(untrustedTable, untrustedKey, untrustedValue)
+				end
+				return unpack(results,2,results.n)
+			else
+				error(results[2],2)
+			end
+		end)
+	end
+	
 	return self
 end
 
